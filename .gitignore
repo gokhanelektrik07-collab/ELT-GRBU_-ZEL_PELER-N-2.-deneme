@@ -1,3 +1,92 @@
-# Build folder and log file
-build/
-build.log
+/ ==UserScript==
+// @name         ELT Hybrid Client v10.1 - Hizalama Fix
+// @match        https://bloxd.io/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let pelerinDurumu = true;
+
+    // --- 1. PELERİN TASARIMI ---
+    function getCapeTexture() {
+        const cvs = document.createElement("canvas");
+        const cx = cvs.getContext("2d");
+        cvs.width = 40; cvs.height = 100;
+        cx.fillStyle = "blue";  cx.fillRect(0, 0, 20, 50);
+        cx.fillStyle = "white"; cx.fillRect(20, 0, 20, 50);
+        cx.fillStyle = "cyan";  cx.fillRect(0, 50, 20, 50);
+        cx.fillStyle = "red";   cx.fillRect(20, 50, 20, 50);
+        cx.fillStyle = "white"; cx.font = "bold 10px Arial"; cx.textAlign = "center";
+        cx.fillText("ELT", 20, 15);
+        cx.fillStyle = "#FFD700"; cx.fillRect(12, 35, 16, 16);
+        cx.fillStyle = "white"; cx.font = "14px Arial"; cx.fillText("⚡", 20, 48);
+        return cvs.toDataURL();
+    }
+    const capeData = getCapeTexture();
+
+    // --- 2. B PLANI: EKRANA MONTE (1 TIK AŞAĞI ALINDI) ---
+    const capeDiv = document.createElement("div");
+    capeDiv.id = "elt-main-cape";
+    capeDiv.style = `
+        position: fixed; 
+        left: 50%; 
+        top: 52.5%; /* BURASI: 51.5'ten 52.5'e çekilerek 1 tık aşağı alındı */
+        width: 45px; 
+        height: 95px; 
+        pointer-events: none; 
+        z-index: 1; 
+        perspective: 600px; 
+        display: none; 
+        transform: translateX(-50%);
+    `;
+    
+    const capeInner = document.createElement("div");
+    capeInner.style = `width:100%; height:100%; background:url(${capeData}); background-size:100% 100%; transform-origin:top; transition: transform 0.1s ease-out;`;
+    
+    capeDiv.appendChild(capeInner);
+    document.body.appendChild(capeDiv);
+
+    // --- 3. A PLANI: ELT ÜYELERİ SENKRONİZASYONU ---
+    function applyToELT() {
+        if(!pelerinDurumu) return;
+        document.querySelectorAll(".player-nick").forEach(nick => {
+            if (nick.innerText.includes("ELT_") && !nick.innerText.includes("AskerbabaprMayhem")) {
+                if (!nick.parentElement.querySelector(".elt-cape-sync")) {
+                    const rCape = document.createElement("div");
+                    rCape.className = "elt-cape-sync";
+                    rCape.style = `position:absolute; width:1em; height:2em; background:url(${capeData}); background-size:100% 100%; top:1.6em; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1;`;
+                    nick.parentElement.appendChild(rCape);
+                }
+            }
+        });
+    }
+
+    // --- 4. FİZİK VE TUŞLAR ---
+    let speed = 0;
+    window.addEventListener('keydown', (e) => {
+        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) speed = 12;
+        if(e.code === 'Space') speed = 25;
+        if(e.code === 'ShiftRight') {
+            pelerinDurumu = !pelerinDurumu;
+        }
+    });
+    window.addEventListener('keyup', () => speed = 0);
+
+    function loop() {
+        if(pelerinDurumu) {
+            capeDiv.style.display = "block";
+            let wave = Math.sin(Date.now()/200) * 4;
+            capeInner.style.transform = `rotateX(${10 + speed + wave}deg)`;
+            applyToELT();
+        } else {
+            capeDiv.style.display = "none";
+            document.querySelectorAll(".elt-cape-sync").forEach(c => c.remove());
+        }
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+    console.log("ELT v10.1: Hizalama Güncellendi (1 Tık Aşağı). ⚡");
+})();
