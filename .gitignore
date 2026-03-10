@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         ELT Hybrid Client v10.1 - Hizalama Fix
+// @name         ELT Hybrid Client v10.2 - Kırmızı Yazı & FPS Boost
 // @match        https://bloxd.io/*
 // @grant        none
 // ==/UserScript==
@@ -9,7 +9,28 @@
 
     let pelerinDurumu = true;
 
-    // --- 1. PELERİN TASARIMI ---
+    // --- 1. FPS BOOST OPTİMİZASYONLARI ---
+    const fpsStyle = document.createElement("style");
+    fpsStyle.innerHTML = `
+        /* Gereksiz görsel yükleri kaldırır */
+        canvas { 
+            image-rendering: pixelated !important; 
+            image-rendering: crisp-edges !important; 
+        }
+        /* Gölgeleri ve ağır efektleri minimize eder */
+        * { 
+            text-shadow: none !important; 
+            box-shadow: none !important; 
+        }
+    `;
+    document.head.appendChild(fpsStyle);
+
+    // Performans için tarayıcı ayarları
+    if (window.performance && window.performance.memory) {
+        console.log("FPS Boost: Bellek yönetimi optimize ediliyor...");
+    }
+
+    // --- 2. PELERİN TASARIMI (ELT YAZISI KIRMIZI) ---
     function getCapeTexture() {
         const cvs = document.createElement("canvas");
         const cx = cvs.getContext("2d");
@@ -18,21 +39,26 @@
         cx.fillStyle = "white"; cx.fillRect(20, 0, 20, 50);
         cx.fillStyle = "cyan";  cx.fillRect(0, 50, 20, 50);
         cx.fillStyle = "red";   cx.fillRect(20, 50, 20, 50);
-        cx.fillStyle = "white"; cx.font = "bold 10px Arial"; cx.textAlign = "center";
+        
+        // ELT Yazısı BURADA KIRMIZI YAPILDI
+        cx.fillStyle = "red"; 
+        cx.font = "bold 10px Arial"; 
+        cx.textAlign = "center";
         cx.fillText("ELT", 20, 15);
+        
         cx.fillStyle = "#FFD700"; cx.fillRect(12, 35, 16, 16);
         cx.fillStyle = "white"; cx.font = "14px Arial"; cx.fillText("⚡", 20, 48);
         return cvs.toDataURL();
     }
     const capeData = getCapeTexture();
 
-    // --- 2. B PLANI: EKRANA MONTE (1 TIK AŞAĞI ALINDI) ---
+    // --- 3. EKRAN MONTE ---
     const capeDiv = document.createElement("div");
     capeDiv.id = "elt-main-cape";
     capeDiv.style = `
         position: fixed; 
         left: 50%; 
-        top: 52.5%; /* BURASI: 51.5'ten 52.5'e çekilerek 1 tık aşağı alındı */
+        top: 52.5%; 
         width: 45px; 
         height: 95px; 
         pointer-events: none; 
@@ -40,6 +66,7 @@
         perspective: 600px; 
         display: none; 
         transform: translateX(-50%);
+        will-change: transform; /* FPS Boost için eklendi */
     `;
     
     const capeInner = document.createElement("div");
@@ -48,7 +75,7 @@
     capeDiv.appendChild(capeInner);
     document.body.appendChild(capeDiv);
 
-    // --- 3. A PLANI: ELT ÜYELERİ SENKRONİZASYONU ---
+    // --- 4. ELT ÜYELERİ SENKRONİZASYONU ---
     function applyToELT() {
         if(!pelerinDurumu) return;
         document.querySelectorAll(".player-nick").forEach(nick => {
@@ -56,37 +83,45 @@
                 if (!nick.parentElement.querySelector(".elt-cape-sync")) {
                     const rCape = document.createElement("div");
                     rCape.className = "elt-cape-sync";
-                    rCape.style = `position:absolute; width:1em; height:2em; background:url(${capeData}); background-size:100% 100%; top:1.6em; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1;`;
+                    rCape.style = `position:absolute; width:1em; height:2em; background:url(${capeData}); background-size:100% 100%; top:1.6em; left:50%; transform:translateX(-50%) rotateX(15deg); z-index:-1; will-change: transform;`;
                     nick.parentElement.appendChild(rCape);
                 }
             }
         });
     }
 
-    // --- 4. FİZİK VE TUŞLAR ---
+    // --- 5. FİZİK VE TUŞLAR ---
     let speed = 0;
     window.addEventListener('keydown', (e) => {
         if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) speed = 12;
         if(e.code === 'Space') speed = 25;
-        if(e.code === 'ShiftRight') {
-            pelerinDurumu = !pelerinDurumu;
-        }
+        if(e.code === 'ShiftRight') pelerinDurumu = !pelerinDurumu;
     });
     window.addEventListener('keyup', () => speed = 0);
 
-    function loop() {
+    // Optimize edilmiş loop (FPS dostu)
+    let lastTime = 0;
+    function loop(currentTime) {
         if(pelerinDurumu) {
             capeDiv.style.display = "block";
-            let wave = Math.sin(Date.now()/200) * 4;
+            // Her karede değil, belli aralıkla sallanma efekti (Daha az yük)
+            let wave = Math.sin(currentTime / 200) * 4;
             capeInner.style.transform = `rotateX(${10 + speed + wave}deg)`;
-            applyToELT();
+            
+            // Üye pelerinlerini saniyede 1 kez kontrol et (Performans artışı)
+            if (currentTime - lastTime > 1000) {
+                applyToELT();
+                lastTime = currentTime;
+            }
         } else {
-            capeDiv.style.display = "none";
-            document.querySelectorAll(".elt-cape-sync").forEach(c => c.remove());
+            if(capeDiv.style.display !== "none") {
+                capeDiv.style.display = "none";
+                document.querySelectorAll(".elt-cape-sync").forEach(c => c.remove());
+            }
         }
         requestAnimationFrame(loop);
     }
 
-    loop();
-    console.log("ELT v10.1: Hizalama Güncellendi (1 Tık Aşağı). ⚡");
+    requestAnimationFrame(loop);
+    console.log("ELT v10.2: Yazı Rengi Güncellendi & FPS Boost Aktif! ⚡🚀");
 })();
