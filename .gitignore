@@ -1,4 +1,4 @@
-/ ==UserScript==
+// ==UserScript==
 // @name         ELT Hybrid Client v10.1 - Hizalama Fix
 // @match        https://bloxd.io/*
 // @grant        none
