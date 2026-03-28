@@ -1,5 +1,9 @@
 // ==UserScript==
-// @name         ELT Hybrid Client v10.5 - Şimşekli Customizer
+// @name         Vortex x ELT Hybrid - Full Customization
+// @namespace    http://tampermonkey.net/
+// @version      22.0
+// @description  Genişlik, Uzunluk, Yükseklik ve İncelik için ayrı ayarlar.
+// @author       Vortex & ELT
 // @match        https://bloxd.io/*
 // @grant        none
 // ==/UserScript==
@@ -7,129 +11,204 @@
 (function() {
     'use strict';
 
+    // --- 1. AYARLAR ---
     let state = {
-        pelerinAcik: true,
         menuAcik: false,
-        genislik: 45,
-        yukseklik: 95,
-        incelik: 600,
-        hiz: 0
+        hiz: 0,
+        currentRotation: 15,
+        clicks: [],
+        // Kontrol Değerleri
+        pelerinGenislik: 34,
+        pelerinBoyutu: 88, // Uzunluk (Height)
+        pelerinYukseklik: 54, // Ense (Top)
+        pelerinIncelik: 400,
+        keystrokesAcik: true,
+        cpsAcik: true
     };
 
-    // --- 1. MOD MENÜSÜ (Sadece Boyut Ayarları) ---
-    const menuDiv = document.createElement("div");
-    menuDiv.style = `
-        position: fixed; top: 50%; left: 85%; transform: translate(-50%, -50%);
-        width: 220px; background: rgba(0, 0, 0, 0.9); border: 2px solid #FFD700;
-        border-radius: 10px; padding: 15px; z-index: 10000; display: none;
-        color: white; font-family: sans-serif; text-align: center; box-shadow: 0 0 15px #FFD700;
-    `;
-    menuDiv.innerHTML = `
-        <h3 style="margin:0; color:#FFD700;">ELT SETTINGS</h3>
-        <p style="font-size:10px;">Menü: <b>*</b> | Pelerin: <b>Shift</b></p>
-        <hr border="1" color="#FFD700">
-        <div style="text-align:left; font-size:12px;">
-            <label>Genişlik: <span id="wV">45</span></label>
-            <input type="range" id="wS" min="20" max="80" value="45" style="width:100%;">
-            <br><br>
-            <label>Yükseklik: <span id="hV">95</span></label>
-            <input type="range" id="hS" min="50" max="150" value="95" style="width:100%;">
-            <br><br>
-            <label>İncelik: <span id="dV">600</span></label>
-            <input type="range" id="dS" min="200" max="1200" value="600" style="width:100%;">
-        </div>
-    `;
-    document.body.appendChild(menuDiv);
+    // --- 2. TASARIM (CSS) ---
+    const style = document.createElement('style');
+    style.innerHTML = `
+        #vortex-elt-menu {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 300px; background: rgba(10, 10, 10, 0.98); border: 2px solid #ff0000;
+            border-radius: 15px; padding: 20px; z-index: 1000001; display: none;
+            color: white; font-family: sans-serif; box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+            max-height: 90vh; overflow-y: auto;
+        }
+        .menu-row { margin-bottom: 12px; display: flex; flex-direction: column; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        label { font-size: 11px; color: #ccc; margin-bottom: 4px; text-transform: uppercase; }
+        
+        .v-btn {
+            background: #222; border: 1px solid #444; color: white; 
+            padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px;
+            transition: 0.2s; min-width: 60px; text-align: center; font-weight: bold;
+        }
+        .v-btn.active { background: #ff0000; border-color: #ff0000; box-shadow: 0 0 8px #ff0000; }
 
-    // --- 2. PELERİN VE SARI ŞİMŞEK ---
-    const capeDiv = document.createElement("div");
-    capeDiv.style = `position: fixed; left: 50%; top: 52.5%; pointer-events: none; z-index: 1; transform: translateX(-50%); perspective: 600px;`;
-    
-    const capeInner = document.createElement("div");
-    capeInner.style = `width:100%; height:100%; background-size:100% 100%; transform-origin:top; transition: transform 0.1s;`;
+        input[type=range] { width: 100%; accent-color: #ff0000; cursor: pointer; }
 
-    function drawCape() {
+        #vortex-hud { position: fixed; top: 20px; right: 20px; z-index: 1000000; pointer-events: none; }
+        .key-row { display: flex; justify-content: center; gap: 4px; margin-bottom: 4px; }
+        .key {
+            width: 38px; height: 38px; background: rgba(0,0,0,0.8); border: 1px solid #333;
+            border-radius: 5px; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white; font-family: monospace;
+        }
+        .key.active { background: #ff0000; box-shadow: 0 0 10px #ff0000; }
+
+        #cape-container { position: fixed; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 5; }
+    `;
+    document.head.appendChild(style);
+
+    // --- 3. PELERİN ÇİZİMİ ---
+    function generateEltCape() {
         const cvs = document.createElement("canvas");
         const cx = cvs.getContext("2d");
         cvs.width = 40; cvs.height = 100;
-
-        // Arka Plan Renkleri (Klasik ELT)
         cx.fillStyle = "blue";  cx.fillRect(0, 0, 20, 50);
         cx.fillStyle = "white"; cx.fillRect(20, 0, 20, 50);
         cx.fillStyle = "cyan";  cx.fillRect(0, 50, 20, 50);
         cx.fillStyle = "red";   cx.fillRect(20, 50, 20, 50);
-
-        // Kırmızı ELT Yazısı
-        cx.fillStyle = "red";
-        cx.font = "bold 10px Arial";
-        cx.textAlign = "center";
-        cx.fillText("ELT", 20, 15);
-
-        // O MEŞHUR SARI ŞİMŞEK LOGOSU
-        cx.fillStyle = "#FFD700"; 
-        cx.fillRect(12, 35, 16, 16); // Altın kare
-        cx.fillStyle = "white"; 
-        cx.font = "14px Arial"; 
-        cx.fillText("⚡", 20, 48);
-
-        capeInner.style.backgroundImage = `url(${cvs.toDataURL()})`;
+        cx.fillStyle = "red"; cx.font = "bold 12px Arial"; cx.textAlign = "center"; cx.fillText("ELT", 20, 18);
+        cx.fillStyle = "white"; cx.font = "16px Arial"; cx.fillText("⚡", 20, 50);
+        return cvs.toDataURL();
     }
+    const capeBase64 = generateEltCape();
 
-    capeDiv.appendChild(capeInner);
-    document.body.appendChild(capeDiv);
-    drawCape();
-
-    // --- 3. TUŞ KONTROLLERİ ---
-    window.addEventListener('keydown', (e) => {
-        // * Tuşu Menü Aç/Kapat
-        if(e.key === '*' || e.code === 'NumpadMultiply') {
-            state.menuAcik = !state.menuAcik;
-            menuDiv.style.display = state.menuAcik ? "block" : "none";
-        }
-        // Shift Tuşu Pelerin Gizle/Göster
-        if(e.key === 'Shift') {
-            state.pelerinAcik = !state.pelerinAcik;
-        }
+    // --- 4. ELEMENTLER ---
+    const menu = document.createElement("div");
+    menu.id = "vortex-elt-menu";
+    menu.innerHTML = `
+        <h3 style="text-align:center; color:#ff0000; margin-top:0;">VORTEX PANEL v22</h3>
         
-        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 15;
+        <div class="toggle-row">
+            <span>KEYBOARD</span>
+            <div id="btn-keys" class="v-btn active">AÇIK</div>
+        </div>
+        <div class="toggle-row">
+            <span>CPS</span>
+            <div id="btn-cps" class="v-btn active">AÇIK</div>
+        </div>
+
+        <hr border="0" style="border-top:1px solid #333; margin: 15px 0;">
+
+        <div class="menu-row">
+            <label>Pelerin Genişliği: <b id="val-width">34</b>px</label>
+            <input type="range" id="set-width" min="10" max="80" value="34">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin Boyutu (Uzunluk): <b id="val-size">88</b>px</label>
+            <input type="range" id="set-size" min="30" max="150" value="88">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin Yüksekliği (Ense): <b id="val-top">54</b>%</label>
+            <input type="range" id="set-top" min="40" max="70" value="54">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin İnceliği (Eğim): <b id="val-slim">400</b></label>
+            <input type="range" id="set-slim" min="100" max="1200" value="400">
+        </div>
+    `;
+    document.body.appendChild(menu);
+
+    const hud = document.createElement("div");
+    hud.id = "vortex-hud";
+    hud.innerHTML = `
+        <div id="keys-group">
+            <div class="key-row"><div id="K_KeyW" class="key">W</div></div>
+            <div class="key-row">
+                <div id="K_KeyA" class="key">A</div>
+                <div id="K_KeyS" class="key">S</div>
+                <div id="K_KeyD" class="key">D</div>
+            </div>
+        </div>
+        <div id="cps-display" class="key" style="width:122px; margin-top:8px; font-size:12px;">CPS: 0</div>
+    `;
+    document.body.appendChild(hud);
+
+    const capeBox = document.createElement("div");
+    capeBox.id = "cape-container";
+    const capeImg = document.createElement("div");
+    capeImg.style = `background: url(${capeBase64}); background-size: 100% 100%; transform-origin: top; transition: transform 0.1s ease-out;`;
+    capeBox.appendChild(capeImg);
+    document.body.appendChild(capeBox);
+
+    // --- 5. FONKSİYONLAR ---
+    const updateGUI = () => {
+        state.pelerinGenislik = document.getElementById("set-width").value;
+        state.pelerinBoyutu = document.getElementById("set-size").value;
+        state.pelerinYukseklik = document.getElementById("set-top").value;
+        state.pelerinIncelik = document.getElementById("set-slim").value;
+
+        document.getElementById("val-width").innerText = state.pelerinGenislik;
+        document.getElementById("val-size").innerText = state.pelerinBoyutu;
+        document.getElementById("val-top").innerText = state.pelerinYukseklik;
+        document.getElementById("val-slim").innerText = state.pelerinIncelik;
+
+        capeImg.style.width = state.pelerinGenislik + "px";
+        capeImg.style.height = state.pelerinBoyutu + "px";
+        capeBox.style.top = state.pelerinYukseklik + "%";
+
+        document.getElementById("keys-group").style.display = state.keystrokesAcik ? "block" : "none";
+        document.getElementById("cps-display").style.display = state.cpsAcik ? "flex" : "none";
+    };
+
+    // Toggle logic
+    document.getElementById("btn-keys").onclick = function() {
+        state.keystrokesAcik = !state.keystrokesAcik;
+        this.innerText = state.keystrokesAcik ? "AÇIK" : "KAPALI";
+        this.classList.toggle("active");
+        updateGUI();
+    };
+    document.getElementById("btn-cps").onclick = function() {
+        state.cpsAcik = !state.cpsAcik;
+        this.innerText = state.cpsAcik ? "AÇIK" : "KAPALI";
+        this.classList.toggle("active");
+        updateGUI();
+    };
+
+    document.getElementById("set-width").oninput = updateGUI;
+    document.getElementById("set-size").oninput = updateGUI;
+    document.getElementById("set-top").oninput = updateGUI;
+    document.getElementById("set-slim").oninput = updateGUI;
+
+    // --- 6. DÖNGÜ VE TUŞLAR ---
+    window.addEventListener('keydown', (e) => {
+        if(document.getElementById(`K_${e.code}`)) document.getElementById(`K_${e.code}`).classList.add('active');
+        if(e.code === 'ShiftRight') {
+            state.menuAcik = !state.menuAcik;
+            menu.style.display = state.menuAcik ? "block" : "none";
+            if(state.menuAcik) document.exitPointerLock?.();
+        }
+        if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 16;
     });
 
     window.addEventListener('keyup', (e) => {
+        if(document.getElementById(`K_${e.code}`)) document.getElementById(`K_${e.code}`).classList.remove('active');
         if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 0;
     });
 
-    // Slider Güncellemeleri
-    const update = () => {
-        state.genislik = document.getElementById("wS").value;
-        state.yukseklik = document.getElementById("hS").value;
-        state.incelik = document.getElementById("dS").value;
-        
-        document.getElementById("wV").innerText = state.genislik;
-        document.getElementById("hV").innerText = state.yukseklik;
-        document.getElementById("dV").innerText = state.incelik;
+    window.addEventListener('mousedown', (e) => { if(e.button === 0) state.clicks.push(Date.now()); });
 
-        capeDiv.style.width = state.genislik + "px";
-        capeDiv.style.height = state.yukseklik + "px";
-        capeDiv.style.perspective = state.incelik + "px";
-    };
-
-    document.getElementById("wS").oninput = update;
-    document.getElementById("hS").oninput = update;
-    document.getElementById("dS").oninput = update;
-
-    // --- 4. ANİMASYON DÖNGÜSÜ ---
-    function loop(currentTime) {
-        if(state.pelerinAcik) {
-            capeDiv.style.display = "block";
-            let wave = Math.sin(currentTime / 200) * 5;
-            capeInner.style.transform = `rotateX(${10 + state.hiz + wave}deg)`;
+    function update(t) {
+        if(document.querySelector(".Chat")) {
+            capeBox.style.display = "block";
+            let wave = Math.sin(t / 250) * 3;
+            let targetRot = 8 + state.hiz + wave;
+            state.currentRotation += (targetRot - state.currentRotation) * 0.1;
+            capeImg.style.transform = `perspective(${state.pelerinIncelik}px) rotateX(${state.currentRotation}deg)`;
+            
+            const now = Date.now();
+            state.clicks = state.clicks.filter(c => now - c < 1000);
+            document.getElementById("cps-display").innerText = "CPS: " + state.clicks.length;
         } else {
-            capeDiv.style.display = "none";
+            capeBox.style.display = "none";
         }
-        requestAnimationFrame(loop);
+        requestAnimationFrame(update);
     }
 
-    update(); // İlk ayarları uygula
-    requestAnimationFrame(loop);
-    console.log("ELT v10.5 Aktif! Yıldız(*) Menü, Shift Pelerin Gizleme.");
+    updateGUI();
+    requestAnimationFrame(update);
 })();
