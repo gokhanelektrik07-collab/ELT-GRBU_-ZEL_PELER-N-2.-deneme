@@ -44,7 +44,7 @@
         }
         .v-btn.active { background: #ff0000; border-color: #ff0000; }
         input[type=range] { width: 100%; accent-color: #ff0000; cursor: pointer; }
-        
+
         #vortex-hud { position: fixed; top: 20px; right: 20px; z-index: 1000000; pointer-events: none; }
         .key {
             width: 42px; height: 42px; background: rgba(0,0,0,0.8); border: 1px solid #333;
@@ -77,7 +77,7 @@
     document.body.appendChild(capeBox);
 
     // --- 3. MENÜLER ---
-    
+
     // Sağ Shift: TÜM AYARLAR
     const mainMenu = document.createElement("div");
     mainMenu.className = "v-panel";
@@ -144,7 +144,7 @@
         capeImg.style.width = state.pelerinGenislik + "px";
         capeImg.style.height = state.pelerinBoyutu + "px";
         capeBox.style.top = state.pelerinYukseklik + "%";
-        
+
         hud.querySelector("div:nth-child(1)").parentElement.style.display = state.keystrokesAcik ? "block" : "none";
         document.getElementById("cps-display").style.display = state.cpsAcik ? "flex" : "none";
     };
@@ -218,11 +218,11 @@
         } else {
             capeBox.style.display = "none";
         }
-        
+
         const now = Date.now();
         state.clicks = state.clicks.filter(c => now - c < 1000);
         document.getElementById("cps-display").innerText = "CPS: " + state.clicks.length;
-        
+
         requestAnimationFrame(animate);
     }
 
