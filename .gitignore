@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Vortex x ELT Hybrid - Full Customization
+// @name         Vortex x ELT Hybrid - All-in-One Custom
 // @namespace    http://tampermonkey.net/
-// @version      22.0
-// @description  Genişlik, Uzunluk, Yükseklik ve İncelik için ayrı ayarlar.
+// @version      29.0
+// @description  J: Klavye Rengi | Sağ Shift: Tüm Pelerin ve HUD Ayarları | *: Pelerin Gizle/Aç
 // @author       Vortex & ELT
 // @match        https://bloxd.io/*
 // @grant        none
@@ -11,58 +11,51 @@
 (function() {
     'use strict';
 
-    // --- 1. AYARLAR ---
     let state = {
-        menuAcik: false,
+        mainMenuOpen: false,
+        colorMenuOpen: false,
+        pelerinAcik: true,
         hiz: 0,
         currentRotation: 15,
-        clicks: [],
-        // Kontrol Değerleri
+        keyboardColor: '#ff0000',
         pelerinGenislik: 34,
-        pelerinBoyutu: 88, // Uzunluk (Height)
-        pelerinYukseklik: 54, // Ense (Top)
+        pelerinBoyutu: 88,
+        pelerinYukseklik: 54,
         pelerinIncelik: 400,
         keystrokesAcik: true,
-        cpsAcik: true
+        cpsAcik: true,
+        clicks: []
     };
 
-    // --- 2. TASARIM (CSS) ---
+    // --- 1. CSS TASARIMI ---
     const style = document.createElement('style');
     style.innerHTML = `
-        #vortex-elt-menu {
+        .v-panel {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 300px; background: rgba(10, 10, 10, 0.98); border: 2px solid #ff0000;
-            border-radius: 15px; padding: 20px; z-index: 1000001; display: none;
-            color: white; font-family: sans-serif; box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
-            max-height: 90vh; overflow-y: auto;
+            background: rgba(10, 10, 10, 0.98); border-radius: 15px; padding: 20px;
+            z-index: 1000001; display: none; color: white; font-family: sans-serif;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.4); border: 2px solid #ff0000; min-width: 280px;
         }
         .menu-row { margin-bottom: 12px; display: flex; flex-direction: column; }
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        label { font-size: 11px; color: #ccc; margin-bottom: 4px; text-transform: uppercase; }
-        
+        label { font-size: 11px; color: #bbb; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
         .v-btn {
-            background: #222; border: 1px solid #444; color: white; 
-            padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px;
-            transition: 0.2s; min-width: 60px; text-align: center; font-weight: bold;
+            background: #1a1a1a; border: 1px solid #333; color: white; padding: 10px;
+            border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; transition: 0.2s;
         }
-        .v-btn.active { background: #ff0000; border-color: #ff0000; box-shadow: 0 0 8px #ff0000; }
-
+        .v-btn.active { background: #ff0000; border-color: #ff0000; }
         input[type=range] { width: 100%; accent-color: #ff0000; cursor: pointer; }
-
+        
         #vortex-hud { position: fixed; top: 20px; right: 20px; z-index: 1000000; pointer-events: none; }
-        .key-row { display: flex; justify-content: center; gap: 4px; margin-bottom: 4px; }
         .key {
-            width: 38px; height: 38px; background: rgba(0,0,0,0.8); border: 1px solid #333;
-            border-radius: 5px; display: flex; align-items: center; justify-content: center;
-            font-weight: bold; color: white; font-family: monospace;
+            width: 42px; height: 42px; background: rgba(0,0,0,0.8); border: 1px solid #333;
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white; margin: 2px; transition: 0.1s;
         }
-        .key.active { background: #ff0000; box-shadow: 0 0 10px #ff0000; }
-
         #cape-container { position: fixed; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 5; }
     `;
     document.head.appendChild(style);
 
-    // --- 3. PELERİN ÇİZİMİ ---
+    // --- 2. PELERİN ÇİZİMİ ---
     function generateEltCape() {
         const cvs = document.createElement("canvas");
         const cx = cvs.getContext("2d");
@@ -75,140 +68,164 @@
         cx.fillStyle = "white"; cx.font = "16px Arial"; cx.fillText("⚡", 20, 50);
         return cvs.toDataURL();
     }
-    const capeBase64 = generateEltCape();
-
-    // --- 4. ELEMENTLER ---
-    const menu = document.createElement("div");
-    menu.id = "vortex-elt-menu";
-    menu.innerHTML = `
-        <h3 style="text-align:center; color:#ff0000; margin-top:0;">VORTEX PANEL v22</h3>
-        
-        <div class="toggle-row">
-            <span>KEYBOARD</span>
-            <div id="btn-keys" class="v-btn active">AÇIK</div>
-        </div>
-        <div class="toggle-row">
-            <span>CPS</span>
-            <div id="btn-cps" class="v-btn active">AÇIK</div>
-        </div>
-
-        <hr border="0" style="border-top:1px solid #333; margin: 15px 0;">
-
-        <div class="menu-row">
-            <label>Pelerin Genişliği: <b id="val-width">34</b>px</label>
-            <input type="range" id="set-width" min="10" max="80" value="34">
-        </div>
-        <div class="menu-row">
-            <label>Pelerin Boyutu (Uzunluk): <b id="val-size">88</b>px</label>
-            <input type="range" id="set-size" min="30" max="150" value="88">
-        </div>
-        <div class="menu-row">
-            <label>Pelerin Yüksekliği (Ense): <b id="val-top">54</b>%</label>
-            <input type="range" id="set-top" min="40" max="70" value="54">
-        </div>
-        <div class="menu-row">
-            <label>Pelerin İnceliği (Eğim): <b id="val-slim">400</b></label>
-            <input type="range" id="set-slim" min="100" max="1200" value="400">
-        </div>
-    `;
-    document.body.appendChild(menu);
-
-    const hud = document.createElement("div");
-    hud.id = "vortex-hud";
-    hud.innerHTML = `
-        <div id="keys-group">
-            <div class="key-row"><div id="K_KeyW" class="key">W</div></div>
-            <div class="key-row">
-                <div id="K_KeyA" class="key">A</div>
-                <div id="K_KeyS" class="key">S</div>
-                <div id="K_KeyD" class="key">D</div>
-            </div>
-        </div>
-        <div id="cps-display" class="key" style="width:122px; margin-top:8px; font-size:12px;">CPS: 0</div>
-    `;
-    document.body.appendChild(hud);
 
     const capeBox = document.createElement("div");
     capeBox.id = "cape-container";
     const capeImg = document.createElement("div");
-    capeImg.style = `background: url(${capeBase64}); background-size: 100% 100%; transform-origin: top; transition: transform 0.1s ease-out;`;
+    capeImg.style = `background: url(${generateEltCape()}); background-size: 100% 100%; transform-origin: top; transition: transform 0.1s;`;
     capeBox.appendChild(capeImg);
     document.body.appendChild(capeBox);
 
-    // --- 5. FONKSİYONLAR ---
+    // --- 3. MENÜLER ---
+    
+    // Sağ Shift: TÜM AYARLAR
+    const mainMenu = document.createElement("div");
+    mainMenu.className = "v-panel";
+    mainMenu.id = "main-menu";
+    mainMenu.innerHTML = `
+        <h3 style="text-align:center; color:#ff0000; margin-top:0;">VORTEX MASTER SETTINGS</h3>
+        <div class="menu-row"><div id="btn-keys" class="v-btn active">KEYBOARD HUD: AÇIK</div></div>
+        <div class="menu-row"><div id="btn-cps" class="v-btn active">CPS HUD: AÇIK</div></div>
+        <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+        <div class="menu-row">
+            <label>Pelerin Genişlik: <b id="txt-w">${state.pelerinGenislik}</b></label>
+            <input type="range" id="set-w" min="10" max="100" value="${state.pelerinGenislik}">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin Boyut (Uzunluk): <b id="txt-h">${state.pelerinBoyutu}</b></label>
+            <input type="range" id="set-h" min="30" max="200" value="${state.pelerinBoyutu}">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin Yükseklik (Ense): <b id="txt-top">${state.pelerinYukseklik}</b>%</label>
+            <input type="range" id="set-top" min="20" max="80" value="${state.pelerinYukseklik}">
+        </div>
+        <div class="menu-row">
+            <label>Pelerin İncelik (Eğim): <b id="txt-slim">${state.pelerinIncelik}</b></label>
+            <input type="range" id="set-slim" min="100" max="1500" value="${state.pelerinIncelik}">
+        </div>
+    `;
+    document.body.appendChild(mainMenu);
+
+    // J Tuşu: SADECE KLAVYE RENK
+    const colorMenu = document.createElement("div");
+    colorMenu.className = "v-panel";
+    colorMenu.id = "color-menu";
+    colorMenu.innerHTML = `
+        <h3 style="text-align:center; color:#ff0000; margin-top:0;">KEYBOARD COLOR</h3>
+        <div class="menu-row">
+            <label>TUŞ RENGİNİ SEÇ:</label>
+            <input type="color" id="key-color-picker" style="width:100%; height:50px; cursor:pointer; border:none; background:none;" value="${state.keyboardColor}">
+        </div>
+    `;
+    document.body.appendChild(colorMenu);
+
+    // HUD
+    const hud = document.createElement("div");
+    hud.id = "vortex-hud";
+    hud.innerHTML = `
+        <div style="display:flex; justify-content:center;"><div id="K_KeyW" class="key">W</div></div>
+        <div style="display:flex;"><div id="K_KeyA" class="key">A</div><div id="K_KeyS" class="key">S</div><div id="K_KeyD" class="key">D</div></div>
+        <div id="cps-display" class="key" style="width:132px; font-size:12px; margin-top:5px;">CPS: 0</div>
+    `;
+    document.body.appendChild(hud);
+
+    // --- 4. FONKSİYONLAR ---
     const updateGUI = () => {
-        state.pelerinGenislik = document.getElementById("set-width").value;
-        state.pelerinBoyutu = document.getElementById("set-size").value;
+        state.pelerinGenislik = document.getElementById("set-w").value;
+        state.pelerinBoyutu = document.getElementById("set-h").value;
         state.pelerinYukseklik = document.getElementById("set-top").value;
         state.pelerinIncelik = document.getElementById("set-slim").value;
 
-        document.getElementById("val-width").innerText = state.pelerinGenislik;
-        document.getElementById("val-size").innerText = state.pelerinBoyutu;
-        document.getElementById("val-top").innerText = state.pelerinYukseklik;
-        document.getElementById("val-slim").innerText = state.pelerinIncelik;
+        document.getElementById("txt-w").innerText = state.pelerinGenislik;
+        document.getElementById("txt-h").innerText = state.pelerinBoyutu;
+        document.getElementById("txt-top").innerText = state.pelerinYukseklik;
+        document.getElementById("txt-slim").innerText = state.pelerinIncelik;
 
         capeImg.style.width = state.pelerinGenislik + "px";
         capeImg.style.height = state.pelerinBoyutu + "px";
         capeBox.style.top = state.pelerinYukseklik + "%";
-
-        document.getElementById("keys-group").style.display = state.keystrokesAcik ? "block" : "none";
+        
+        hud.querySelector("div:nth-child(1)").parentElement.style.display = state.keystrokesAcik ? "block" : "none";
         document.getElementById("cps-display").style.display = state.cpsAcik ? "flex" : "none";
     };
 
-    // Toggle logic
-    document.getElementById("btn-keys").onclick = function() {
-        state.keystrokesAcik = !state.keystrokesAcik;
-        this.innerText = state.keystrokesAcik ? "AÇIK" : "KAPALI";
-        this.classList.toggle("active");
-        updateGUI();
-    };
-    document.getElementById("btn-cps").onclick = function() {
-        state.cpsAcik = !state.cpsAcik;
-        this.innerText = state.cpsAcik ? "AÇIK" : "KAPALI";
-        this.classList.toggle("active");
-        updateGUI();
-    };
-
-    document.getElementById("set-width").oninput = updateGUI;
-    document.getElementById("set-size").oninput = updateGUI;
-    document.getElementById("set-top").oninput = updateGUI;
-    document.getElementById("set-slim").oninput = updateGUI;
-
-    // --- 6. DÖNGÜ VE TUŞLAR ---
+    // --- 5. ETKİLEŞİMLER ---
     window.addEventListener('keydown', (e) => {
-        if(document.getElementById(`K_${e.code}`)) document.getElementById(`K_${e.code}`).classList.add('active');
-        if(e.code === 'ShiftRight') {
-            state.menuAcik = !state.menuAcik;
-            menu.style.display = state.menuAcik ? "block" : "none";
-            if(state.menuAcik) document.exitPointerLock?.();
+        // Tuş basma rengi
+        const keyEl = document.getElementById(`K_${e.code}`);
+        if(keyEl) {
+            keyEl.style.backgroundColor = state.keyboardColor;
+            keyEl.style.boxShadow = `0 0 15px ${state.keyboardColor}`;
         }
+
+        // J - Renk Menüsü
+        if(e.code === 'KeyJ') {
+            state.colorMenuOpen = !state.colorMenuOpen;
+            colorMenu.style.display = state.colorMenuOpen ? "block" : "none";
+            if(state.colorMenuOpen) { state.mainMenuOpen = false; mainMenu.style.display="none"; document.exitPointerLock?.(); }
+        }
+
+        // Sağ Shift - Ana Ayarlar
+        if(e.code === 'ShiftRight') {
+            state.mainMenuOpen = !state.mainMenuOpen;
+            mainMenu.style.display = state.mainMenuOpen ? "block" : "none";
+            if(state.mainMenuOpen) { state.colorMenuOpen = false; colorMenu.style.display="none"; document.exitPointerLock?.(); }
+        }
+
+        // * Tuşu - Pelerin Gizle
+        if(e.key === '*') state.pelerinAcik = !state.pelerinAcik;
+
         if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 16;
     });
 
     window.addEventListener('keyup', (e) => {
-        if(document.getElementById(`K_${e.code}`)) document.getElementById(`K_${e.code}`).classList.remove('active');
+        const keyEl = document.getElementById(`K_${e.code}`);
+        if(keyEl) {
+            keyEl.style.backgroundColor = "rgba(0,0,0,0.8)";
+            keyEl.style.boxShadow = "none";
+        }
         if(['KeyW','KeyS','KeyA','KeyD'].includes(e.code)) state.hiz = 0;
     });
 
+    // İnput Bağlantıları
+    document.getElementById("key-color-picker").oninput = (e) => state.keyboardColor = e.target.value;
+    document.getElementById("set-w").oninput = updateGUI;
+    document.getElementById("set-h").oninput = updateGUI;
+    document.getElementById("set-top").oninput = updateGUI;
+    document.getElementById("set-slim").oninput = updateGUI;
+
+    document.getElementById("btn-keys").onclick = function() {
+        state.keystrokesAcik = !state.keystrokesAcik;
+        this.innerText = "KEYBOARD HUD: " + (state.keystrokesAcik ? "AÇIK" : "KAPALI");
+        this.classList.toggle("active"); updateGUI();
+    };
+
+    document.getElementById("btn-cps").onclick = function() {
+        state.cpsAcik = !state.cpsAcik;
+        this.innerText = "CPS HUD: " + (state.cpsAcik ? "AÇIK" : "KAPALI");
+        this.classList.toggle("active"); updateGUI();
+    };
+
     window.addEventListener('mousedown', (e) => { if(e.button === 0) state.clicks.push(Date.now()); });
 
-    function update(t) {
-        if(document.querySelector(".Chat")) {
+    function animate(t) {
+        if(document.querySelector(".Chat") && state.pelerinAcik) {
             capeBox.style.display = "block";
             let wave = Math.sin(t / 250) * 3;
             let targetRot = 8 + state.hiz + wave;
             state.currentRotation += (targetRot - state.currentRotation) * 0.1;
             capeImg.style.transform = `perspective(${state.pelerinIncelik}px) rotateX(${state.currentRotation}deg)`;
-            
-            const now = Date.now();
-            state.clicks = state.clicks.filter(c => now - c < 1000);
-            document.getElementById("cps-display").innerText = "CPS: " + state.clicks.length;
         } else {
             capeBox.style.display = "none";
         }
-        requestAnimationFrame(update);
+        
+        const now = Date.now();
+        state.clicks = state.clicks.filter(c => now - c < 1000);
+        document.getElementById("cps-display").innerText = "CPS: " + state.clicks.length;
+        
+        requestAnimationFrame(animate);
     }
 
     updateGUI();
-    requestAnimationFrame(update);
+    requestAnimationFrame(animate);
 })();
